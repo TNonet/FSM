@@ -103,3 +103,20 @@ class fcsr_matrix:
         out = np.asfortranarray(out)
         finite_matmul_2d(out, self.b_decomp, other)
         return out
+
+    def to_array(self):
+        array = np.zeros(self.shape)
+        for b_matrix in self.b_decomp:
+            array += b_matrix.to_array()
+        return array
+
+    @property
+    def size(self):
+        nnz = 0
+        for b_matrix in self.b_decomp:
+            nnz += b_matrix.size
+        return nnz
+
+    @property
+    def sparsity(self):
+        return self.size / (self.shape[0] * self.shape[1])

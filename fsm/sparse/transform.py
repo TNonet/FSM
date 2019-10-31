@@ -1,9 +1,9 @@
 import numpy as np
-import numba as nb
+from numba import jit
 
 from .spartype import *
 
-@nb.jit(nopython=True)
+@jit(nopython=True)
 def coo_to_csr(n_row, nnz, rows_indices, col_indices, data=None):
     """
     Converst data in COO form:
@@ -80,8 +80,31 @@ def csr_to_coo(row_p, col_i, shape):
     return rows_indices, col_indices
 
 @jit(nopython=True)
-def coo_to_array(rows_indices, col_indices, shape):
+def coo_to_dense(rows_indices, col_indices, shape):
     array = np.zeros((np.int64(shape[0]), np.int64(shape[1])))
     for i, j in zip(rows_indices, col_indices):
         array[i, j] = 1
-    return array.astype(d_type)
+    return array
+
+
+@jit(nopython=True)
+def dense_to_coo(array):
+    """
+
+    :param array:
+    :return:
+    """
+    if len(array.shape) != 2:
+        raise NotImplementedError("Must be a two dimensional array")
+    m, n = array.shape
+    rows = []
+    cols = []
+    data = []
+    for i in range(m):
+        for j in range(n):
+            if array[i, j] != 0:
+                rows.append(i)
+                cols.append(j)
+                data.append(array[i, j])
+    return np.array(rows), np.array(cols), np.array(data), (m, n)
+
