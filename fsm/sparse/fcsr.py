@@ -1,15 +1,14 @@
 """Compressed Finite Sparse Row Matrix"""
 
-import numba as nb
+from numba import jitclass
 import numpy as np
 
 from .spartype import *
-from .bcsr import bcsr_constructor, bcsr_matrix
-from .matmul import finite_matmul_1d, finite_matmul_2d
+from .bcsr import bcsr_matrix
+from .matmul import finite_matmul_2d, finite_matmul_1d
 
 
-
-def fcsr_constructor(num):
+def fcsr_constructor(b_matrix_iterable):
     """
     Notes:
         numba requires all functions to return consistent types.
@@ -22,101 +21,114 @@ def fcsr_constructor(num):
     #   1. Feasibility of Data
     #   2. Converting Data to Proper Format
     #   3. Changing Types of Data
-    binary_decomp = []
-    for i in range(1,num):
-        binary_decomp.append(bcsr_constructor(i, i))
+    shape = None
+    for b_matrix in b_matrix_iterable:
+        if shape is None:
+            shape = b_matrix.shape
+        elif shape == b_matrix.shape:
+            pass
+        else:
+            raise ValueError("Shapes don't Match")
 
-    binary_decomp = tuple(binary_decomp)
+    depth = len(b_matrix_iterable)
+    b_matrix_decomp = tuple(b_matrix_iterable)
 
-    return fcsr_matrix(binary_decomp, len(binary_decomp), (5,5))
+    bcsr_type = nb.deferred_type()
+    bcsr_type.define(bcsr_matrix.class_type.instance_type)
 
-bcsr_type = nb.deferred_type()
-bcsr_type.define(bcsr_matrix.class_type.instance_type)
+    fcsr_spec = [
+        ('shape', nb.types.UniTuple(nb.int64, 2)),
+        ('b_decomp', nb.types.UniTuple(bcsr_type, depth)),
+    ]
 
-fcsr_spec = [
-    ('shape', nb.types.UniTuple(nb.int64, 2)),
-    ('depth', nb.int64),
-    ('b_decomp', nb.types.UniTuple(bcsr_type, 4)),
-]
+    @jitclass(fcsr_spec)
+    class fcsr_matrix:
+        def __init__(self, _b_decomp, _shape):
+            """
 
+            :param _row_p:
+            :param _col_i:
+            :param _shape:
+            """
 
-@nb.jitclass(fcsr_spec)
-class fcsr_matrix:
-    def __init__(self, _b_decomp, _depth, _shape):
-        """
+            self.shape = _shape
+            self.b_decomp = _b_decomp
 
-        :param _row_p:
-        :param _col_i:
-        :param _shape:
-        """
+        @property
+        def depth(self):
+            return len(self.b_decomp)
 
-        self.shape = _shape
-        self.depth = _depth
-        self.b_decomp = _b_decomp
+        def dot1d(self, other):
+            """
 
-    def dot1d(self, other):
-        """
+            :param other:
+            :return:
+            """
+            if len(other.shape) != 1:
+                raise Exception('Must be a 1d Array')
 
-        :param other:
-        :return:
-        """
+            d1 = other.shape[0]
+            m, n = self.shape
 
-        m, n = self.shape
+            if n != d1:
+                raise Exception('Dimension MisMatch')
 
-        if len(other.shape) == 2:
-            raise NameError("Use dot2d")
-        elif len(other.shape) > 2:
-            raise NotImplementedError
+            return finite_matmul_1d(self.b_decomp, other, m)
 
-        d1 = other.shape[0]
-        m, n = self.shape
+        def dot2d(self, other):
+            """
 
-        if n != d1:
-            raise Exception('Dimension MisMatch')
+            :param other:
+            :return:
+            """
+            if len(other.shape) != 2:
+                raise Exception('Must be a 2d Array')
 
-        out = np.zeros(n, dtype=FLOAT_STORAGE_np)
-        finite_matmul_1d(out, self.b_decomp, other)
-        return out
+            m, n = self.shape
+            d1, k = other.shape
 
-    def dot2d(self, other):
-        """
+            if k > 1 and other.flags.c_contiguous:
+                raise Exception("Use Fortran Array")
 
-        :param other:
-        :return:
-        """
-        m, n = self.shape
+            if n != d1:
+                raise Exception('Dimension MisMatch')
 
-        if len(other.shape) == 1:
-            raise NameError("Use dot1d")
-        elif len(other.shape) > 2:
-            raise NotImplementedError
+            return finite_matmul_2d(self.b_decomp, other, m, k)
 
-        if other.flags.c_contiguous:
-            raise ValueError("Use Fortran Array")
+        def to_array(self):
+            array = np.zeros(self.shape)
+            for sub_b_matrix in self.b_decomp:
+                array += sub_b_matrix.to_array()
+            return array
 
-        d1, k = other.shape
+        @property
+        def size(self):
+            nnz = 0
+            for sub_b_matrix in self.b_decomp:
+                nnz += sub_b_matrix.size
+            return nnz
 
-        if n != d1:
-            raise Exception('Dimension MisMatch')
+        @property
+        def sparsity(self):
+            return self.size / (self.shape[0] * self.shape[1])
 
-        out = np.zeros((n, k), dtype=FLOAT_STORAGE_np)
-        out = np.asfortranarray(out)
-        finite_matmul_2d(out, self.b_decomp, other)
-        return out
+        @property
+        def mem(self):
+            return self.__sizeof__()
 
-    def to_array(self):
-        array = np.zeros(self.shape)
-        for b_matrix in self.b_decomp:
-            array += b_matrix.to_array()
-        return array
+        def __sizeof__(self):
+            """
+            returns roughly the memory storage of instance in Bytes
 
-    @property
-    def size(self):
-        nnz = 0
-        for b_matrix in self.b_decomp:
-            nnz += b_matrix.size
-        return nnz
+            Storage Includes:
+                self.row_p
+                self.col_i
 
-    @property
-    def sparsity(self):
-        return self.size / (self.shape[0] * self.shape[1])
+            :return:
+            """
+            mem = 0
+            for b_matrix in self.b_decomp:
+                mem += b_matrix.mem
+            return mem
+
+    return fcsr_matrix(b_matrix_decomp, shape)

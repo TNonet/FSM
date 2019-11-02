@@ -3,10 +3,10 @@ import numpy as np
 
 from fsm.sparse.bcsr import bcsr_matrix
 from fsm.sparse.transform import coo_to_csr, dense_to_coo
-from random_gen import test_matrix
+from random_gen import test_b_matrix
 
 
-test_gen = test_matrix()
+test_gen = test_b_matrix()
 
 class BinaryTestCase(unittest.TestCase):
     """Tests
@@ -74,7 +74,8 @@ class BinaryTestCase(unittest.TestCase):
             array_np, array_sparse = next(test_gen)
             k = np.random.randint(2, 100)
             m, n = array_np.shape
-            u = np.random.rand(k, n).T
+            u = np.random.rand(n, k)
+            u = np.asfortranarray(u)
             np.testing.assert_array_almost_equal(array_np.dot(u), array_sparse.dot2d(u))
 
     def test_Matrix_1d(self):
