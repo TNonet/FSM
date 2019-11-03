@@ -12,7 +12,7 @@ bcsr_spec = [
     ('row_p', POINT_STORAGE_nb[::1]),
     ('col_i', INDEX_STORAGE_nb[::1]),
     ('shape', nb.types.UniTuple(nb.int64, 2)),
-    ('alpha', FLOAT_STORAGE_nb),
+    ('alpha', FLOAT_STORAGE_nb)
 ]
 
 
@@ -62,8 +62,9 @@ class bcsr_matrix:
 
         d1, k = other.shape
 
-        if k > 1 and other.flags.c_contiguous:
-            raise Exception("Use Fortran Array")
+        # Somehow this check crashes the Kernel
+        # if k > 1 and other.flags.c_contiguous:
+        #     raise Exception("Use Fortran Array")
 
         if n != d1:
             raise Exception('Dimension MisMatch')
@@ -109,7 +110,8 @@ class bcsr_matrix:
         m, n = self.shape
         rows, cols = csr_to_coo(self.row_p, self.col_i, self.shape)
         row_p, col_i = coo_to_csr(n, len(rows), cols, rows, data=None)
-        temp = bcsr_matrix(row_p, col_i, (n, m))
-        temp.alpha = self.alpha
-        return temp
+
+        temp_b_matrix = bcsr_matrix(row_p, col_i, (n, m))
+        temp_b_matrix.alpha = self.alpha
+        return temp_b_matrix
 

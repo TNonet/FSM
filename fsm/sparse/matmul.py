@@ -40,11 +40,11 @@ def binary_matmul_1d(row_p, col_i, other, m):
 
 @nb.jit(nopython=True, parallel=True, nogil=True)
 def binary_matmul_2d(row_p, col_i, other, m, k):
-    out = np.zeros((m, k), dtype=FLOAT_STORAGE_np)
-    out = np.asfortranarray(out)
+    out_2d = np.zeros((m, k), dtype=FLOAT_STORAGE_np)
+    out_2d = np.asfortranarray(out_2d)
     for j in nb.prange(k):
-        out[:, j] = binary_matmul_1d(row_p, col_i, other[:, j], m)
-    return out
+        out_2d[:, j] = binary_matmul_1d(row_p, col_i, other[:, j], m)
+    return out_2d
 
 @nb.jit(nopython=True)
 def finite_matmul_1d(b_decomp, other, m):

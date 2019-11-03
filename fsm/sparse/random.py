@@ -4,7 +4,7 @@ from .spartype import *
 
 
 @jit(nopython=True)
-def SNP(m, n, max_density, min_density=0, data_n=1):
+def SNP(m, n, max_density, min_density=0, data_n=1, sym=False):
     """
     Creates a sparse M by N matrix following the procedure:
 
@@ -47,24 +47,29 @@ def SNP(m, n, max_density, min_density=0, data_n=1):
 
     for j in range(n):
         b_temp = binomials[j]
-        for i in range(0, m):
+        if sym:
+            rng_max = min(j, m) # Only fill triangle without diagonal
+        else:
+            rng_max = m
+        for i in range(0, rng_max):
             data_temp = np.random.binomial(data_n, b_temp)
             if data_temp > 0:
                 # A[i,j] -> A
                 rows.append(i)
                 cols.append(j)
                 data.append(data_temp)
-        # ##### Old Symmetric Logic
-        #         # A[j, i] -> A transpose
-        #         rows.append(j)
-        #         cols.append(i)
-        #         data.append(data_temp)
-        # # A[j, j] -> Diag(A)
-        # data_temp = np.random.binomial(data_n, b_temp)
-        # if data_temp > 0:
-        #     rows.append(j)
-        #     cols.append(j)
-        #     data.append(data_temp)
+                if sym:
+                    # A[j, i] -> A transpose
+                    rows.append(j)
+                    cols.append(i)
+                    data.append(data_temp)
+        # A[j, j] -> Diag(A)
+        if sym:
+            data_temp = np.random.binomial(data_n, b_temp)
+            if data_temp > 0:
+                rows.append(j)
+                cols.append(j)
+                data.append(data_temp)
 
     shape = (m, n)
     data_array = np.array(data).astype(FLOAT_STORAGE_np)

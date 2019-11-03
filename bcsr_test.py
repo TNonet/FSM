@@ -110,6 +110,13 @@ class BinaryTestCase(unittest.TestCase):
             array_np, array_sparse = next(test_gen)
             np.testing.assert_array_equal(array_np.T, array_sparse.T.to_array())
 
+    def test_SNP_sym(self):
+        temp_test_gen = test_b_matrix(sym=True)
+        for i in range(10):
+            array_np, array_sparse = next(temp_test_gen)
+            np.testing.assert_array_equal(array_np, array_sparse.T.to_array())
+            np.testing.assert_array_equal(array_np.T, array_sparse.to_array())
+
     def test_Transpose_Transpose(self):
         for i in range(10):
             array_np, array_sparse = next(test_gen)
