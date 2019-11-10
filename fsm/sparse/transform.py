@@ -1,5 +1,5 @@
 import numpy as np
-from numba import jit
+from numba import jit, prange
 
 from .spartype import *
 
@@ -107,4 +107,88 @@ def dense_to_coo(array):
                 cols.append(j)
                 data.append(array[i, j])
     return np.array(rows), np.array(cols), np.array(data), (m, n)
+
+
+@jit(nopython=True, parallel=True, nogil=True)
+def TSQR(array, clusters=8):
+    """
+    https://web.stanford.edu/group/ctr/Summer/SP14/08_Transition_and_turbulence/08_sayadi.pdf
+    :param array:
+    :param clusters:
+    :return:
+    """
+    m, n = array.shape
+    stack_R = np.zeros((clusters*n, n))
+    stack_Q = []
+
+    stride_list = [0]
+    stride = m//clusters
+    curr_stride = stride
+    for i in range(clusters-1):
+        stride_list.append(curr_stride)
+        curr_stride += stride
+    stride_list.append(min(m, curr_stride))
+
+    for i in prange(clusters):
+        Q, R = np.linalg.qr(array[stride_list[i]:stride_list[i+1], :])
+        stack_R[i*n:(i+1)*n, :] = R
+        stack_Q.append(Q)
+
+    Q, _ = np.linalg.qr(stack_R)
+
+    return_Q = np.zeros_like(array)
+    for i in range(clusters):
+        return_Q[stride_list[i]:stride_list[i+1], :] = stack_Q[i].dot(Q[i*n:(i+1)*n, :])
+        # print('Return Q: ', return_Q[stride_list[i]:stride_list[i+1], :].shape)
+        # print('Stack Q: ', stack_Q[i].shape)
+        # print('Middle Q:', Q[i*n:(i+1)*n, :].shape)
+    return return_Q
+
+
+def coo_to_fcoo(rows_indices, col_indices, data, shape):
+    """
+    Convert general COO form to Finite COO form
+        Finite COO:
+            {a_1: [row_indicies(a_1), col_indices(a_1)],
+            a_2: [row_indicies(a_2), col_indices(a_2)],
+            ...
+            a_d: [row_indicies(a_d), col_indices(a_d)]}
+
+        Allows for creating d BCSR matrices
+
+    :param rows_indices: Integer np.array \in {1, 2, ... m}^N
+    :param col_indices: Integer np.array \in {1, 2, ..., n}^N
+    :param data: Numeric np.array \in {a_1, a_2, ... a_d}^N
+    :param shape: 2-Tuple of Intergers (m, n)
+    """
+    m, n = shape
+    if 1 > m or 1 > n:
+        raise Exception('Matrix must have positive dimensions')
+
+    Nnz = len(data)
+
+    if Nnz != len(col_indices):
+        raise Exception
+    if Nnz != len(rows_indices):
+        raise Exception
+
+    if m * n < Nnz:
+        raise Exception("Too many elements to store")
+    if m*n < 10 * Nnz:
+        raise Warning("Matrix has sparsity above 10%")
+
+    fcoo_dict = {}
+    for i in range(Nnz):
+        if data[i] not in fcoo_dict:
+            fcoo_dict[data[i]] = [[rows_indices[i]], [col_indices[i]]]
+        else:
+            fcoo_dict[data[i]][0].append(rows_indices[i])
+            fcoo_dict[data[i]][1].append(col_indices[i])
+
+    return fcoo_dict
+
+
+
+
+
 

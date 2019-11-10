@@ -87,8 +87,8 @@ def fcsr_constructor(b_matrix_iterable):
             m, n = self.shape
             d1, k = other.shape
 
-            if k > 1 and other.flags.c_contiguous:
-                raise Exception("Use Fortran Array")
+            # if k > 1 and other.flags.c_contiguous:
+            #     raise Exception("Use Fortran Array")
 
             if n != d1:
                 raise Exception('Dimension MisMatch')

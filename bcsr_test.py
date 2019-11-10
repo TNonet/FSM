@@ -31,8 +31,6 @@ class BinaryTestCase(unittest.TestCase):
         a) One Transpose Check with Numpy
         b) Double Transpose check with self and numpy
     """
-
-
     def test_Identity(self):
         for i in range(10):
             n = 2**i
@@ -45,33 +43,33 @@ class BinaryTestCase(unittest.TestCase):
 
     def test_Random(self):
         for i in range(10):
-            array_np, array_sparse = next(test_gen)
+            array_np, array_sparse, _ = next(test_gen)
             np.testing.assert_array_equal(array_np, array_sparse.to_array())
 
     def test_Vector(self):
         for i in range(10):
-            array_np, array_sparse = next(test_gen)
+            array_np, array_sparse, _ = next(test_gen)
             m, n = array_np.shape
             u = np.random.normal(size=n)
             np.testing.assert_array_almost_equal(array_np.dot(u), array_sparse.dot1d(u))
 
     @unittest.expectedFailure
     def test_Vector_shape_mismatch(self):
-        array_np, array_sparse = next(test_gen)
+        array_np, array_sparse, _ = next(test_gen)
         m, n = array_np.shape
         u = np.random.normal(size=n+1)
         array_sparse.dot1d(u)
 
     @unittest.expectedFailure
     def test_Vector_shape_overloads(self):
-        array_np, array_sparse = next(test_gen)
+        array_np, array_sparse, _ = next(test_gen)
         m, n = array_np.shape
         u = np.random.rand(n, n, n)
         array_sparse.dot1d(u)
 
     def test_Matrix(self):
         for i in range(10):
-            array_np, array_sparse = next(test_gen)
+            array_np, array_sparse, _ = next(test_gen)
             k = np.random.randint(2, 100)
             m, n = array_np.shape
             u = np.random.rand(n, k)
@@ -80,7 +78,7 @@ class BinaryTestCase(unittest.TestCase):
 
     def test_Matrix_1d(self):
         for i in range(10):
-            array_np, array_sparse = next(test_gen)
+            array_np, array_sparse, _ = next(test_gen)
             k = np.random.randint(2, 100)
             m, n = array_np.shape
             u = np.random.rand(n, 1)
@@ -90,7 +88,7 @@ class BinaryTestCase(unittest.TestCase):
     @unittest.expectedFailure
     def test_Matrix_shape_mistmatch(self):
         for i in range(10):
-            array_np, array_sparse = next(test_gen)
+            array_np, array_sparse, _ = next(test_gen)
             k = np.random.randint(2, 100)
             m, n = array_np.shape
             u = np.random.rand(k, n+1).T
@@ -99,7 +97,7 @@ class BinaryTestCase(unittest.TestCase):
     @unittest.expectedFailure
     def test_Matrix_shape_overload(self):
         for i in range(10):
-            array_np, array_sparse = next(test_gen)
+            array_np, array_sparse, _ = next(test_gen)
             k = np.random.randint(2, 100)
             m, n = array_np.shape
             u = np.random.rand(k, k, n).T
@@ -107,20 +105,27 @@ class BinaryTestCase(unittest.TestCase):
 
     def test_Transpose(self):
         for i in range(10):
-            array_np, array_sparse = next(test_gen)
+            array_np, array_sparse, _ = next(test_gen)
             np.testing.assert_array_equal(array_np.T, array_sparse.T.to_array())
 
     def test_SNP_sym(self):
         temp_test_gen = test_b_matrix(sym=True)
         for i in range(10):
-            array_np, array_sparse = next(temp_test_gen)
+            array_np, array_sparse, _ = next(temp_test_gen)
             np.testing.assert_array_equal(array_np, array_sparse.T.to_array())
             np.testing.assert_array_equal(array_np.T, array_sparse.to_array())
 
     def test_Transpose_Transpose(self):
         for i in range(10):
-            array_np, array_sparse = next(test_gen)
+            array_np, array_sparse, _ = next(test_gen)
             np.testing.assert_array_equal(array_sparse.T.T.to_array(), array_sparse.to_array())
+
+    def test_Scipy(self):
+        for i in range(10):
+            array_np, array_sparse, array_scipy = next(test_gen)
+            np.testing.assert_array_equal(array_np, array_scipy.toarray())
+            np.testing.assert_array_equal(array_sparse.to_array(), array_scipy.toarray())
+
 
 if __name__ == '__main__':
     unittest.main()

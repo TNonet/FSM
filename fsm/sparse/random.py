@@ -76,4 +76,4 @@ def SNP(m, n, max_density, min_density=0, data_n=1, sym=False):
     rows_array = np.array(rows).astype(INDEX_STORAGE_np)
     cols_array = np.array(cols).astype(INDEX_STORAGE_np)
 
-    return data_array, rows_array, cols_array, shape
+    return rows_array, cols_array, data_array, shape
