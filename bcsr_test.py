@@ -2,11 +2,12 @@ import unittest
 import numpy as np
 
 from fsm.sparse.bcsr import bcsr_matrix
-from fsm.sparse.transform import coo_to_csr, dense_to_coo
-from random_gen import test_b_matrix
+from fsm.sparse.transform import coo_to_bcsr, dense_to_coo
+from random_gen import test_bcsr_matrix
 
 
-test_gen = test_b_matrix()
+test_gen = test_bcsr_matrix()
+
 
 class BinaryTestCase(unittest.TestCase):
     """Tests
@@ -36,7 +37,7 @@ class BinaryTestCase(unittest.TestCase):
             n = 2**i
             array_np = np.eye(n)
             rows, cols, data, shape = dense_to_coo(array_np)
-            row_p, col_i = coo_to_csr(n, len(rows), rows, cols)
+            row_p, col_i = coo_to_bcsr(n, len(rows), rows, cols)
             array_sparse = bcsr_matrix(row_p, col_i, (n, n))
 
             np.testing.assert_array_equal(array_np, array_sparse.to_array())
@@ -79,7 +80,6 @@ class BinaryTestCase(unittest.TestCase):
     def test_Matrix_1d(self):
         for i in range(10):
             array_np, array_sparse, _ = next(test_gen)
-            k = np.random.randint(2, 100)
             m, n = array_np.shape
             u = np.random.rand(n, 1)
             u = np.asfortranarray(u)
@@ -109,7 +109,7 @@ class BinaryTestCase(unittest.TestCase):
             np.testing.assert_array_equal(array_np.T, array_sparse.T.to_array())
 
     def test_SNP_sym(self):
-        temp_test_gen = test_b_matrix(sym=True)
+        temp_test_gen = test_bcsr_matrix(sym=True)
         for i in range(10):
             array_np, array_sparse, _ = next(temp_test_gen)
             np.testing.assert_array_equal(array_np, array_sparse.T.to_array())

@@ -1,11 +1,9 @@
 import unittest
 import numpy as np
+from random_gen import test_fcsr_matrix
 
 
-from random_gen import test_f_matrix
-
-
-test_gen = test_f_matrix()
+test_gen = test_fcsr_matrix()
 
 
 class FiniteTestCase(unittest.TestCase):

@@ -4,7 +4,7 @@ from .spartype import *
 
 
 @jit(nopython=True)
-def SNP(m, n, max_density, min_density=0, data_n=1, sym=False):
+def SNP_to_coo(m, n, max_density, min_density=0, data_n=1, sym=False):
     """
     Creates a sparse M by N matrix following the procedure:
 
@@ -36,6 +36,7 @@ def SNP(m, n, max_density, min_density=0, data_n=1, sym=False):
     :param max_density: Maximum density of a column
     :param min_density: Minimum density of a column
     :param data_n: Generation of
+    :param sym: Boolean is matrix symmetric or not
     """
     m = np.int64(m)
     n = np.int64(n)
@@ -48,7 +49,7 @@ def SNP(m, n, max_density, min_density=0, data_n=1, sym=False):
     for j in range(n):
         b_temp = binomials[j]
         if sym:
-            rng_max = min(j, m) # Only fill triangle without diagonal
+            rng_max = min(j, m)  # Only fill triangle without diagonal
         else:
             rng_max = m
         for i in range(0, rng_max):

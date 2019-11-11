@@ -47,17 +47,19 @@ def binary_matmul_2d(row_p, col_i, other, m, k):
     return out_2d
 
 @nb.jit(nopython=True)
-def finite_matmul_1d(b_decomp, other, m):
+def finite_matmul_1d(bcsr_decomp, other, m):
     out = np.zeros(m, dtype=FLOAT_STORAGE_np)
-    for b_matrix in b_decomp:
-        out += b_matrix.dot1d(other)
+    for bcsr_matrix in bcsr_decomp:
+        if not bcsr_matrix.empty:
+            out += bcsr_matrix.dot1d(other)
     return out
 
 
 @nb.jit(nopython=True)
-def finite_matmul_2d(b_decomp, other, m, k):
+def finite_matmul_2d(bcsr_decomp, other, m, k):
     out = np.zeros((m, k), dtype=FLOAT_STORAGE_np)
     out = np.asfortranarray(out)
-    for b_matrix in b_decomp:
-        out += b_matrix.dot2d(other)
+    for bcsr_matrix in bcsr_decomp:
+        if not bcsr_matrix.empty:
+            out += bcsr_matrix.dot2d(other)
     return out

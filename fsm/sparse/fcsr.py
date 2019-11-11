@@ -8,127 +8,158 @@ from .bcsr import bcsr_matrix
 from .matmul import finite_matmul_2d, finite_matmul_1d
 
 
-def fcsr_constructor(b_matrix_iterable):
+def fcsr_matrix(arg1, shape=None):
     """
-    Notes:
-        numba requires all functions to return consistent types.
+    Can be instantiated in 2 ways:
 
+        fcsr_constructor(bcsr_iterable)
+            bcsr_iterable is a iterable of bcsr matrices
 
-    :return:
+        fcsr_constructor(fcoo, shape)
+            fcoo is a dictionary of binary coo form
+            See coo_to_fcoo
+
+    :return: FCSR
     """
+    if isinstance(arg1, (tuple, list)):
+        if len(arg1) > 10:
+            raise Exception("To Large of FCSR. Adjust MAX_BCSR in transform.py")
+        for b_matrix in arg1:
+            if shape is None:
+                shape = b_matrix.shape
+            elif shape == b_matrix.shape:
+                pass
+            else:
+                raise Exception("Shapes don't Match")
 
-    # Logic for Determining;
-    #   1. Feasibility of Data
-    #   2. Converting Data to Proper Format
-    #   3. Changing Types of Data
-    shape = None
-    for b_matrix in b_matrix_iterable:
+        b_matrix_decomp = list(arg1)
+        for empty_b_matrix in range(10-len(arg1)):
+            b_matrix_decomp.append(bcsr_matrix(_row_p=np.array([], dtype=POINT_STORAGE_np),
+                                               _col_i=np.array([], dtype=INDEX_STORAGE_np),
+                                               _shape=shape))
+
+        b_matrix_decomp = tuple(b_matrix_decomp)
+        return fcsr_matrix_(_bcsr_decomp=b_matrix_decomp, _shape=shape)
+
+    elif isinstance(arg1, dict):
         if shape is None:
-            shape = b_matrix.shape
-        elif shape == b_matrix.shape:
-            pass
-        else:
-            raise ValueError("Shapes don't Match")
+            raise Exception("Shape must be defined")
+        b_matrix_decomp = []
+        for key in arg1.keys():
+            temp_bcsr_matrix = bcsr_matrix(arg1[key][0],
+                                           arg1[key][1],
+                                           _shape=shape)
+            temp_bcsr_matrix.alpha = key
+            b_matrix_decomp.append(temp_bcsr_matrix)
 
-    depth = len(b_matrix_iterable)
-    b_matrix_decomp = tuple(b_matrix_iterable)
+        for empty_b_matrix in range(10-len(arg1)):
+            b_matrix_decomp.append(bcsr_matrix(_row_p=np.array([], dtype=POINT_STORAGE_np),
+                                               _col_i=np.array([], dtype=INDEX_STORAGE_np),
+                                               _shape=shape))
 
-    bcsr_type = nb.deferred_type()
-    bcsr_type.define(bcsr_matrix.class_type.instance_type)
+        b_matrix_decomp = tuple(b_matrix_decomp)
+        return fcsr_matrix_(_bcsr_decomp=b_matrix_decomp, _shape=shape)
+    else:
+        raise NotImplementedError
 
-    fcsr_spec = [
-        ('shape', nb.types.UniTuple(nb.int64, 2)),
-        ('b_decomp', nb.types.UniTuple(bcsr_type, depth)),
-    ]
 
-    @jitclass(fcsr_spec)
-    class fcsr_matrix:
-        def __init__(self, _b_decomp, _shape):
-            """
+bcsr_type = nb.deferred_type()
+bcsr_type.define(bcsr_matrix.class_type.instance_type)
 
-            :param _row_p:
-            :param _col_i:
-            :param _shape:
-            """
+fcsr_spec = [
+    ('shape', nb.types.UniTuple(nb.int64, 2)),
+    ('bcsr_decomp', nb.types.UniTuple(bcsr_type, MAX_BCSR)),
+]
 
-            self.shape = _shape
-            self.b_decomp = _b_decomp
 
-        @property
-        def depth(self):
-            return len(self.b_decomp)
+@jitclass(fcsr_spec)
+class fcsr_matrix_:
+    """
+    Finite Compressed Row Matrix
+    """
+    def __init__(self, _bcsr_decomp, _shape):
+        """
+        """
 
-        def dot1d(self, other):
-            """
+        self.shape = _shape
+        self.bcsr_decomp = _bcsr_decomp
 
-            :param other:
-            :return:
-            """
-            if len(other.shape) != 1:
-                raise Exception('Must be a 1d Array')
+    @property
+    def depth(self):
+        return len(self.bcsr_decomp)
 
-            d1 = other.shape[0]
-            m, n = self.shape
+    def dot1d(self, other):
+        """
 
-            if n != d1:
-                raise Exception('Dimension MisMatch')
+        :param other:
+        :return:
+        """
+        if len(other.shape) != 1:
+            raise Exception('Must be a 1d Array')
 
-            return finite_matmul_1d(self.b_decomp, other, m)
+        d1 = other.shape[0]
+        m, n = self.shape
 
-        def dot2d(self, other):
-            """
+        if n != d1:
+            raise Exception('Dimension MisMatch')
 
-            :param other:
-            :return:
-            """
-            if len(other.shape) != 2:
-                raise Exception('Must be a 2d Array')
+        return finite_matmul_1d(self.bcsr_decomp, other, m)
 
-            m, n = self.shape
-            d1, k = other.shape
+    def dot2d(self, other):
+        """
 
-            # if k > 1 and other.flags.c_contiguous:
-            #     raise Exception("Use Fortran Array")
+        :param other:
+        :return:
+        """
+        if len(other.shape) != 2:
+            raise Exception('Must be a 2d Array')
 
-            if n != d1:
-                raise Exception('Dimension MisMatch')
+        m, n = self.shape
+        d1, k = other.shape
 
-            return finite_matmul_2d(self.b_decomp, other, m, k)
+        # if k > 1 and other.flags.c_contiguous:
+        #     raise Exception("Use Fortran Array")
 
-        def to_array(self):
-            array = np.zeros(self.shape)
-            for sub_b_matrix in self.b_decomp:
-                array += sub_b_matrix.to_array()
-            return array
+        if n != d1:
+            raise Exception('Dimension MisMatch')
 
-        @property
-        def size(self):
-            nnz = 0
-            for sub_b_matrix in self.b_decomp:
-                nnz += sub_b_matrix.size
-            return nnz
+        return finite_matmul_2d(self.bcsr_decomp, other, m, k)
 
-        @property
-        def sparsity(self):
-            return self.size / (self.shape[0] * self.shape[1])
+    def to_array(self):
+        array = np.zeros(self.shape)
+        for sub_bcsr_matrix in self.bcsr_decomp:
+            if not sub_bcsr_matrix.empty:
+                array += sub_bcsr_matrix.to_array()
+        return array
 
-        @property
-        def mem(self):
-            return self.__sizeof__()
+    @property
+    def size(self):
+        nnz = 0
+        for sub_bcsr_matrix in self.bcsr_decomp:
+            if not sub_bcsr_matrix.empty:
+                nnz += sub_bcsr_matrix.size
+        return nnz
 
-        def __sizeof__(self):
-            """
-            returns roughly the memory storage of instance in Bytes
+    @property
+    def sparsity(self):
+        return self.size / (self.shape[0] * self.shape[1])
 
-            Storage Includes:
-                self.row_p
-                self.col_i
+    @property
+    def mem(self):
+        return self.__sizeof__()
 
-            :return:
-            """
-            mem = 0
-            for b_matrix in self.b_decomp:
-                mem += b_matrix.mem
-            return mem
+    def __sizeof__(self):
+        """
+        returns roughly the memory storage of instance in Bytes
 
-    return fcsr_matrix(b_matrix_decomp, shape)
+        Storage Includes:
+            self.row_p
+            self.col_i
+
+        :return:
+        """
+        mem = 0
+        for sub_bcsr_matrix in self.bcsr_decomp:
+            if not sub_bcsr_matrix.empty:
+                mem += sub_bcsr_matrix.mem
+        return mem
