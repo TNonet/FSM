@@ -73,8 +73,9 @@ target/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-#idea
-.idea
+# Mac
+.DS_Store
+
 
 # pyenv
 .python-version
@@ -108,6 +109,7 @@ venv.bak/
 .mypy_cache/
 
 # User-specific stuff
+.idea
 .idea/**/workspace.xml
 .idea/**/tasks.xml
 .idea/**/usage.statistics.xml
